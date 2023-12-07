@@ -4,54 +4,39 @@ from discord.ext import commands, tasks
 import discord
 
 class MyClient(commands.Bot):
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        file=open("crdata.txt", "w")
-        file.close()
+    def init(self, *args, **kwargs):
+        super().init(*args, **kwargs)
+        with open("crdata.txt", "w"):
+            pass
 
     async def on_ready(self):
-        channel = bot.get_channel()  # replace with channel ID that you want to send to
+        channel = self.get_channel("ID here")  # channel's ID
         await self.timer.start(channel)
 
     @tasks.loop(seconds=600)
     async def timer(self, channel):
-        r=requests.get("https://chess-results.com/Transfer.aspx?key5=TS", data={"key5":"TS"})
-        
+        r = requests.get("https://chess-results.com/Transfer.aspx?key5=TS", data={"key5": "TS"})
         soup = BeautifulSoup(r.text, "html.parser")
-        
-        table = soup.findAll('table', class_='CRs2')[0]
-        
-        tds=table.findAll("td")
-        
-        
+        table = soup.find('table', class_='CRs2')
+        tds = table.find_all("td")
+        with open("crdata.txt", "r") as file:
+            links = file.readlines()
         for i in tds:
-            tournament=i.find("a")
-            if str(tournament)!="None":
-                file=open("crdata.txt", "r")
-                links=file.readlines()
-                file.close()
-                link=tournament["href"]
-                name=tournament.text
-                r1=requests.get("https://chess-results.com/"+link)
-                soup1=BeautifulSoup(r1.text, "html.parser")
-                td1=soup1.findAll("td", "CRr")
-                real_td=0
-                for j in td1:
-                    text=j.text
-                    if text.isdigit():
-                        if int(text)>=1000 and 3000>=int(text):
-                            real_td=int(text)
-                if real_td>=1500: #any rating you need
-                    if not (link+"\n" in links):
-                        print(name,link,real_td)
-                        await channel.send(name+" "+"https://chess-results.com/"+link+" "+str(real_td)+"\n")
-                        file=open("crdata.txt", "a")
-                        file.write(link+"\n")
-                        file.close()
-                    else:
-                        pass
-                        print("Waiting for new tournaments")
+            tournament = i.find("a")
+            if tournament:
+                link = tournament["href"]
+                name = tournament.text
+                r1 = requests.get("https://chess-results.com/" + link)
+                soup1 = BeautifulSoup(r1.text, "html.parser")
+                td1 = soup1.find_all("td", "CRr")
+                real_td = next((int(j.text) for j in td1 if j.text.isdigit() and 1000 <= int(j.text) <= 3000), 0)
+                if real_td >= 2400 and link + "\n" not in links:
+                    print(name, link, real_td)
+                    await channel.send(f"{name} https://chess-results.com/{link} {real_td}\n")
+                    with open("crdata.txt", "a") as file:
+                        file.write(f"{link}\n")
+                else:
+                    print("Waiting for new tournaments")
 
 bot = MyClient(command_prefix='!', intents=discord.Intents().all())
-bot.run("")  # replace with bot token
+bot.run("") #replace with token
